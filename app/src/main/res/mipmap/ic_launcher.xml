@@ -1,0 +1,16 @@
+<!-- Pre-API-26 launchers have no adaptive icon support, so they get a flat one. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#0B0F14"
+        android:pathData="M12,0 h84 a12,12 0 0 1 12,12 v84 a12,12 0 0 1 -12,12 h-84 a12,12 0 0 1 -12,-12 v-84 a12,12 0 0 1 12,-12 z" />
+    <path
+        android:fillColor="#34D399"
+        android:pathData="M50,30 h8 v24 h13 l-17,19 -17,-19 h13 z" />
+    <path
+        android:fillColor="#34D399"
+        android:pathData="M34,78 h40 v6 h-40 z" />
+</vector>
