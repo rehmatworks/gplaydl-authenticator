@@ -12,3 +12,6 @@ captures/
 signing.properties
 *.keystore
 *.jks
+
+# Test account credentials.
+.env
