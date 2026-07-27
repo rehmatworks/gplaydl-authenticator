@@ -14,6 +14,11 @@ val signingProps = Properties().apply {
     if (file.exists()) file.inputStream().use { load(it) }
 }
 
+// Published builds are tagged, and the release workflow derives these from the
+// tag. The fallbacks only describe a locally built APK.
+val appVersionName = (findProperty("appVersionName") as String?) ?: "1.1.2"
+val appVersionCode = (findProperty("appVersionCode") as String?)?.toInt() ?: 17
+
 android {
     namespace = "com.gplaydl.authenticator"
     compileSdk = 36
@@ -22,8 +27,8 @@ android {
         applicationId = "com.gplaydl.authenticator"
         minSdk = 24
         targetSdk = 36
-        versionCode = 17
-        versionName = "1.1.2"
+        versionCode = appVersionCode
+        versionName = appVersionName
 
         buildConfigField("String", "DEFAULT_DISPENSER_URL", "\"https://dispenser.gplaydl.com\"")
         buildConfigField("String", "CONSENT_VERSION", "\"2026-07-27\"")

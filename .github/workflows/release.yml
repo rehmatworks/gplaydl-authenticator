@@ -1,0 +1,213 @@
+name: Release
+
+# Tagging is the release trigger: the tag decides the version, so there is no
+# version to forget to bump in build.gradle.kts.
+on:
+  push:
+    tags: ["v*"]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  # Every published build must be signed with this certificate. A different key
+  # produces an APK that existing installs refuse to update to, so the build
+  # fails rather than shipping one.
+  EXPECTED_CERT_SHA256: 3e923468ca1853f21685ad4a698b21259d9898ce9fff35acf65e57a6a548beee
+
+jobs:
+  build:
+    name: Build signed APK
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      version_code: ${{ steps.version.outputs.version_code }}
+      sha256: ${{ steps.checksum.outputs.sha256 }}
+      apk_name: ${{ steps.checksum.outputs.apk_name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Derive version from tag
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if [[ ! "$version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            echo "::error::Tag '$GITHUB_REF_NAME' is not vMAJOR.MINOR.PATCH" >&2
+            exit 1
+          fi
+          major="${BASH_REMATCH[1]}"
+          minor="${BASH_REMATCH[2]}"
+          patch="${BASH_REMATCH[3]}"
+
+          # versionCode must only ever increase. Two digits each for minor and
+          # patch keeps that true; wider numbers would silently break ordering.
+          if (( minor > 99 || patch > 99 )); then
+            echo "::error::minor and patch must each be below 100 for versionCode to stay ordered" >&2
+            exit 1
+          fi
+          code=$(( major * 10000 + minor * 100 + patch ))
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "version_code=$code" >> "$GITHUB_OUTPUT"
+          echo "Releasing $version (versionCode $code)"
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Restore signing material
+        env:
+          KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ]; then
+            echo "::error::SIGNING_KEYSTORE_BASE64 is not set" >&2
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > release.keystore
+          # The build reads this file; it never reaches the repository.
+          cat > signing.properties <<EOF
+          storeFile=release.keystore
+          storePassword=$STORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: Lint, test & assemble release
+        run: |
+          ./gradlew --no-daemon \
+            -PappVersionName=${{ steps.version.outputs.version }} \
+            -PappVersionCode=${{ steps.version.outputs.version_code }} \
+            lint testDebugUnitTest assembleRelease
+
+      - name: Verify APK version and signature
+        id: checksum
+        run: |
+          apk=app/build/outputs/apk/release/app-release.apk
+          sdk="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          mapfile -t installed < <(printf '%s\n' "$sdk"/build-tools/*/ | sort -V)
+          tools="${installed[-1]%/}"
+
+          badging=$("$tools/aapt2" dump badging "$apk")
+          echo "$badging" | head -1
+
+          want_name="versionName='${{ steps.version.outputs.version }}'"
+          want_code="versionCode='${{ steps.version.outputs.version_code }}'"
+          for want in "$want_name" "$want_code"; do
+            if ! grep -qF "$want" <<<"$badging"; then
+              echo "::error::APK does not report $want" >&2
+              exit 1
+            fi
+          done
+
+          cert=$("$tools/apksigner" verify --print-certs "$apk" \
+            | sed -n 's/.*certificate SHA-256 digest: //p' | head -1)
+          if [ "$cert" != "$EXPECTED_CERT_SHA256" ]; then
+            echo "::error::APK signed with $cert, expected $EXPECTED_CERT_SHA256" >&2
+            exit 1
+          fi
+          echo "Signed with the expected certificate."
+
+          name="gplaydl-authenticator-${{ steps.version.outputs.version }}.apk"
+          cp "$apk" "$name"
+          sha256=$(sha256sum "$name" | cut -d' ' -f1)
+          echo "apk_name=$name" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+          echo "$sha256  $name" > "$name.sha256"
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f release.keystore signing.properties
+
+      - name: Upload artifact for deploy
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk
+          path: |
+            ${{ steps.checksum.outputs.apk_name }}
+            ${{ steps.checksum.outputs.apk_name }}.sha256
+          retention-days: 30
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          APK: ${{ steps.checksum.outputs.apk_name }}
+        run: |
+          # Re-running the workflow for a tag should replace the assets rather
+          # than fail on an existing release.
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$APK" "$APK.sha256" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --title "Authenticator ${{ steps.version.outputs.version }}" \
+              --generate-notes \
+              --latest \
+              "$APK" "$APK.sha256"
+          fi
+
+  deploy:
+    name: Publish to dispenser
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    concurrency:
+      group: dispenser-app-publish
+      cancel-in-progress: false
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
+      VERSION_CODE: ${{ needs.build.outputs.version_code }}
+      SHA256: ${{ needs.build.outputs.sha256 }}
+      APK: ${{ needs.build.outputs.apk_name }}
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: apk
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "${{ secrets.DEPLOY_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          cat >> ~/.ssh/config <<EOF
+          Host production
+            HostName ${{ secrets.DEPLOY_HOST }}
+            User ${{ secrets.DEPLOY_USER }}
+            Port ${{ secrets.DEPLOY_PORT || '22' }}
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking yes
+          EOF
+
+      # deploy/gplaydl-publish-apk installs the APK, moves the release pointer,
+      # restarts the dispenser and rolls back if it does not come back healthy.
+      # The deploy user may run only that one command as root.
+      - name: Stage and publish the APK
+        run: |
+          scp "$APK" "production:/var/lib/gplaydl-apk-incoming/$APK"
+          # Expanded here so the remote script receives them as arguments. All
+          # four derive from a semver tag, so they cannot contain quoting.
+          # shellcheck disable=SC2029
+          ssh production "sudo /usr/local/sbin/gplaydl-publish-apk \
+            '$VERSION' '$VERSION_CODE' '$SHA256' '$APK'"
+
+      - name: Confirm the public download matches
+        run: |
+          url="https://dispenser.gplaydl.com/downloads/$APK"
+          curl -fsSL --retry 5 --retry-delay 3 -o published.apk "$url"
+          published=$(sha256sum published.apk | cut -d' ' -f1)
+          if [ "$published" != "$SHA256" ]; then
+            echo "::error::$url serves $published, expected $SHA256" >&2
+            exit 1
+          fi
+          echo "Public download matches the signed build."

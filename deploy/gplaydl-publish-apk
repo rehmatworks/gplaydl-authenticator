@@ -1,0 +1,107 @@
+#!/usr/bin/env bash
+#
+# Points the dispenser at a newly built Authenticator APK.
+#
+# The release workflow signs and verifies the APK, then stages it in
+# INCOMING_DIR as the unprivileged deploy user and calls this script through a
+# single sudoers entry. Installing the file, rewriting the release pointer and
+# restarting the service all need root, and none of them should be reachable
+# any other way, so the privileged part is confined to this script.
+#
+# Install as root-owned and non-writable by the deploy user:
+#   install -o root -g root -m 755 gplaydl-publish-apk /usr/local/sbin/
+#   install -d -o dispenser -g dispenser -m 755 /var/lib/gplaydl-apk-incoming
+#   echo 'dispenser ALL=(root) NOPASSWD: /usr/local/sbin/gplaydl-publish-apk' \
+#     > /etc/sudoers.d/gplaydl-publish-apk
+#   chmod 440 /etc/sudoers.d/gplaydl-publish-apk
+#
+# Usage: gplaydl-publish-apk VERSION VERSION_CODE SHA256 FILENAME
+
+set -euo pipefail
+
+readonly INCOMING_DIR=/var/lib/gplaydl-apk-incoming
+readonly DOWNLOAD_DIR=/var/www/downloads
+readonly LATEST_LINK=gplaydl-authenticator-latest.apk
+readonly ENV_FILE=/etc/gplaydl-dispenser/env
+readonly HEALTH_URL=http://localhost:8080/api/health
+readonly RELEASE_URL=http://localhost:8080/api/v1/app/latest
+readonly PUBLIC_BASE=https://dispenser.gplaydl.com/downloads
+
+die() {
+	echo "gplaydl-publish-apk: $*" >&2
+	exit 1
+}
+
+[ "$#" -eq 4 ] || die "usage: $0 VERSION VERSION_CODE SHA256 FILENAME"
+version=$1
+version_code=$2
+sha256=$3
+filename=$4
+
+# The caller is unprivileged, so treat every argument as untrusted.
+[[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || die "bad version: $version"
+[[ $version_code =~ ^[0-9]+$ ]] || die "bad versionCode: $version_code"
+[[ $sha256 =~ ^[0-9a-f]{64}$ ]] || die "bad sha256: $sha256"
+# Rejecting anything but the expected name keeps the path below inside
+# INCOMING_DIR, so a crafted argument cannot reach another directory.
+[ "$filename" = "gplaydl-authenticator-$version.apk" ] || die "bad filename: $filename"
+
+staged="$INCOMING_DIR/$filename"
+[ -f "$staged" ] && [ ! -L "$staged" ] || die "not a regular file: $staged"
+
+actual=$(sha256sum "$staged" | cut -d' ' -f1)
+[ "$actual" = "$sha256" ] || die "staged checksum is $actual, expected $sha256"
+
+# An APK is a zip, so it starts with the local file header magic. Cheap
+# sanity check that we are not about to publish something else entirely.
+[ "$(head -c 4 "$staged" | od -An -tx1 | tr -d ' \n')" = "504b0304" ] ||
+	die "$filename does not look like an APK"
+
+current_code=$(sed -n 's/^APP_VERSION_CODE=//p' "$ENV_FILE" | head -1)
+if [[ $current_code =~ ^[0-9]+$ ]] && [ "$version_code" -le "$current_code" ]; then
+	die "versionCode $version_code does not exceed the published $current_code"
+fi
+
+backup="$ENV_FILE.bak.$(date +%Y%m%d-%H%M%S)"
+previous_link=$(readlink "$DOWNLOAD_DIR/$LATEST_LINK" || true)
+
+rollback() {
+	echo "rolling back to the previous release pointer" >&2
+	cp -a "$backup" "$ENV_FILE"
+	if [ -n "$previous_link" ]; then
+		ln -sfn "$previous_link" "$DOWNLOAD_DIR/$LATEST_LINK"
+	fi
+	systemctl restart gplaydl-dispenser || true
+}
+
+install -o caddy -g caddy -m 644 "$staged" "$DOWNLOAD_DIR/$filename"
+ln -sfn "$filename" "$DOWNLOAD_DIR/$LATEST_LINK"
+rm -f "$staged"
+
+cp -a "$ENV_FILE" "$backup"
+sed -i \
+	-e "s|^APP_VERSION=.*|APP_VERSION=$version|" \
+	-e "s|^APP_VERSION_CODE=.*|APP_VERSION_CODE=$version_code|" \
+	-e "s|^APP_SHA256=.*|APP_SHA256=$sha256|" \
+	-e "s|^APP_DOWNLOAD_URL=.*|APP_DOWNLOAD_URL=$PUBLIC_BASE/$filename|" \
+	"$ENV_FILE"
+
+systemctl restart gplaydl-dispenser
+
+for _ in $(seq 1 15); do
+	curl -fsS "$HEALTH_URL" > /dev/null 2>&1 && break
+	sleep 2
+done
+
+served=$(curl -fsS "$RELEASE_URL" 2>/dev/null || true)
+if [[ $served != *"\"version\":\"$version\""* || $served != *"\"sha256\":\"$sha256\""* ]]; then
+	echo "dispenser is serving: ${served:-<nothing>}" >&2
+	rollback
+	die "dispenser did not come back serving $version"
+fi
+
+# Keep the two most recent backups; the rest are noise.
+ls -1t "$ENV_FILE".bak.* 2>/dev/null | tail -n +3 | xargs -r rm -f
+
+echo "published $version (versionCode $version_code)"
+echo "$served"

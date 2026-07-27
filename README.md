@@ -34,17 +34,22 @@ consent  ->  enrol device  ->  Google sign-in  ->  mint AAS token  ->  sync
 
 | Screen | Purpose |
 |--------|---------|
-| Consent | Explains sharing, sets the default visibility, enrols the device |
-| Accounts | Pool stats, per-account share switch, test and remove |
+| Consent | Explains sharing and enrols the device |
+| Accounts | Per-account visibility switch, health, re-sign-in and remove |
 | Sign in | Google's embedded setup WebView |
 | Open on the web | One-shot pairing code for reaching the dashboard in a browser |
-| Settings | Default visibility, device name, dispenser URL, update check, sign out |
+| Settings | Update check, API key, dispenser URL, disconnect |
 
 ## Building
 
 Requires the Android SDK with platform 36 and **JDK 21** — AGP does not support
-JDK 25, so `gradle.properties` pins `org.gradle.java.home`. Adjust that path if
-your JDK lives elsewhere.
+JDK 25. If `java` on your machine is newer, point Gradle at a JDK 21 in
+`~/.gradle/gradle.properties` rather than in this repo, which has to stay
+portable for CI:
+
+```properties
+org.gradle.java.home=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home
+```
 
 ```bash
 # debug build
@@ -74,6 +79,44 @@ storePassword=...
 keyAlias=gplaydl
 keyPassword=...
 ```
+
+## Releasing
+
+Pushing a `vMAJOR.MINOR.PATCH` tag is the whole release process. `.github/workflows/release.yml`
+derives the version from the tag, builds and signs the APK, attaches it to a
+GitHub release, and publishes it to the dispenser.
+
+```bash
+git tag v1.1.3
+git push origin v1.1.3
+```
+
+`versionCode` is computed as `major * 10000 + minor * 100 + patch`, so `v1.1.3`
+becomes `10103`. The workflow rejects a tag whose minor or patch reaches 100,
+because that would stop the codes increasing in order. `build.gradle.kts` still
+carries a version for local builds; only the tag matters for published ones.
+
+Before the first tagged release, add these repository secrets:
+
+| Secret | Value |
+|--------|-------|
+| `SIGNING_KEYSTORE_BASE64` | `base64 -i gplaydl-authenticator.keystore` |
+| `SIGNING_STORE_PASSWORD` | from `signing.properties` |
+| `SIGNING_KEY_ALIAS` | from `signing.properties` |
+| `SIGNING_KEY_PASSWORD` | from `signing.properties` |
+| `DEPLOY_SSH_KEY` | the dispenser deploy key, same value the dispenser repo uses |
+| `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_KNOWN_HOSTS` | as in the dispenser repo |
+
+The workflow refuses to publish an APK that is not signed with the expected
+certificate (`EXPECTED_CERT_SHA256` in the workflow), since a different key
+produces a build that existing installs cannot update to.
+
+Publishing on the server goes through `deploy/gplaydl-publish-apk`, which is
+installed root-owned at `/usr/local/sbin/` and is the only command the deploy
+user may run as root besides restarting the service. It re-checks the checksum,
+refuses to move `versionCode` backwards, updates `/etc/gplaydl-dispenser/env`,
+restarts the dispenser, and rolls back if it does not come back serving the new
+release. See the header of that script for the install steps.
 
 ## Privacy
 
