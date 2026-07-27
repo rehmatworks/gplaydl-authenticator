@@ -1,7 +1,6 @@
 package com.gplaydl.authenticator.ui.theme
 
 import android.app.Activity
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
@@ -62,7 +61,7 @@ private val AppTypography = Typography().let { base ->
 
 @Composable
 fun GplaydlTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val view = LocalView.current

@@ -18,17 +18,10 @@ data class SyncAccountRequest(
 )
 
 @Serializable
-data class VisibilityRequest(val visibility: String)
-
-@Serializable
-data class MeResponse(val user: DispenserUser)
+data class VisibilityRequest(
+    val visibility: String,
+    val consentVersion: String? = null,
+)
 
 @Serializable
 data class StatusResponse(val status: String = "")
-
-@Serializable
-data class TestResult(
-    val success: Boolean = false,
-    val error: String = "",
-    val durationMs: Long = 0,
-)

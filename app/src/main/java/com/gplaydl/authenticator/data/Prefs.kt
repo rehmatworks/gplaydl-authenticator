@@ -3,7 +3,6 @@ package com.gplaydl.authenticator.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
-import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -26,8 +25,6 @@ class Prefs(private val context: Context) {
         val apiKey = stringPreferencesKey("api_key")
         val consentVersion = stringPreferencesKey("consent_version")
         val dispenserUrl = stringPreferencesKey("dispenser_url")
-        val shareByDefault = booleanPreferencesKey("share_by_default")
-        val label = stringPreferencesKey("label")
     }
 
     val state: Flow<AppState> = context.dataStore.data.map { p ->
@@ -35,8 +32,7 @@ class Prefs(private val context: Context) {
             apiKey = p[Keys.apiKey],
             consentVersion = p[Keys.consentVersion],
             dispenserUrl = p[Keys.dispenserUrl] ?: BuildConfig.DEFAULT_DISPENSER_URL,
-            shareByDefault = p[Keys.shareByDefault] ?: true,
-            label = p[Keys.label] ?: android.os.Build.MODEL.orEmpty().ifBlank { "Android device" },
+            label = android.os.Build.MODEL.orEmpty().ifBlank { "Android device" },
         )
     }
 
@@ -64,10 +60,6 @@ class Prefs(private val context: Context) {
 
     suspend fun setDispenserUrl(url: String) = edit { it[Keys.dispenserUrl] = url.trimEnd('/') }
 
-    suspend fun setShareByDefault(share: Boolean) = edit { it[Keys.shareByDefault] = share }
-
-    suspend fun setLabel(label: String) = edit { it[Keys.label] = label }
-
     /** Forgets the enrolment. Accounts already shared stay in the pool. */
     suspend fun signOut() = edit { p ->
         p.remove(Keys.apiKey)
@@ -91,7 +83,6 @@ data class AppState(
     val apiKey: String? = null,
     val consentVersion: String? = null,
     val dispenserUrl: String = BuildConfig.DEFAULT_DISPENSER_URL,
-    val shareByDefault: Boolean = true,
     val label: String = "Android device",
 ) {
     val isEnrolled: Boolean get() = !apiKey.isNullOrBlank()

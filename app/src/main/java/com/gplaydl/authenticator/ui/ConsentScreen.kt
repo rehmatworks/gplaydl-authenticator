@@ -20,14 +20,9 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -41,8 +36,6 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun ConsentScreen(
     dispenserUrl: String,
-    shareByDefault: Boolean,
-    onShareByDefaultChange: (Boolean) -> Unit,
     onAccept: () -> Unit,
     working: Boolean,
     onOpenSettings: () -> Unit,
@@ -56,15 +49,13 @@ fun ConsentScreen(
             .padding(horizontal = 24.dp, vertical = 32.dp),
     ) {
         Text(
-            text = "Share a Google login,\nkeep gplaydl working",
+            text = "Before you add an account",
             style = MaterialTheme.typography.headlineMedium,
         )
         Spacer(Modifier.height(12.dp))
         Text(
-            text = "gplaydl downloads apps from Google Play, and Google only answers " +
-                "requests that come from a real signed-in account. This app signs you in, " +
-                "turns that into a reusable token, and hands the token to the gplaydl " +
-                "dispenser so the community can keep downloading.",
+            text = "This app creates a reusable Google Play credential and stores it on " +
+                "the gplaydl dispenser. Read this before continuing.",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -73,55 +64,26 @@ fun ConsentScreen(
 
         ConsentPoint(
             icon = Icons.Outlined.Groups,
-            title = "What the community gets",
-            body = "A token that can browse and download free apps as your account. " +
-                "Accounts take turns, so no single login carries the whole pool.",
+            title = "Use a spare account",
+            body = "Do not use your primary, work, payment-linked, or purchased-app account. " +
+                "Google may revoke unofficial client access.",
         )
         ConsentPoint(
             icon = Icons.Outlined.Lock,
-            title = "What never leaves your phone",
-            body = "Your password, your 2FA codes and your Google session cookies. " +
-                "Only the token and the account's email address are uploaded, and the " +
-                "token is stored encrypted.",
+            title = "What is uploaded",
+            body = "The account email and AAS token. The token can browse and download free " +
+                "Google Play apps as that account, and is encrypted at rest.",
         )
         ConsentPoint(
             icon = Icons.Outlined.Visibility,
-            title = "What you keep control of",
-            body = "You can flip any account back to private, or delete it from the " +
-                "dispenser, at any time. Revoking the app under your Google " +
-                "account settings kills the token outright.",
+            title = "You choose for every account",
+            body = "Before Google sign-in, choose Community or Private. You can make an " +
+                "account private or delete it later. Passwords, 2FA codes, and cookies are " +
+                "never sent to the dispenser.",
         )
 
         Spacer(Modifier.height(8.dp))
-        Text(
-            text = "Please use a spare Google account. Do not share an account that holds " +
-                "purchases, payment methods or personal mail you care about.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.error,
-        )
-
-        Spacer(Modifier.height(24.dp))
-
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text("Share new accounts with the community", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text = if (shareByDefault) {
-                        "Accounts you add join the public pool straight away."
-                    } else {
-                        "Accounts you add stay private and only you can use them."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Switch(checked = shareByDefault, onCheckedChange = onShareByDefaultChange)
-        }
-
-        Spacer(Modifier.height(28.dp))
+        Spacer(Modifier.height(16.dp))
 
         Button(
             onClick = onAccept,
@@ -135,7 +97,7 @@ fun ConsentScreen(
                     color = MaterialTheme.colorScheme.onPrimary,
                 )
             } else {
-                Text("I understand — continue")
+                Text("I understand and want to continue")
             }
         }
 
@@ -148,7 +110,7 @@ fun ConsentScreen(
             modifier = Modifier.fillMaxWidth(),
         )
         TextButton(onClick = onOpenSettings, modifier = Modifier.fillMaxWidth()) {
-            Text("Use a different dispenser")
+            Text("Advanced server settings")
         }
         Spacer(Modifier.height(16.dp))
     }

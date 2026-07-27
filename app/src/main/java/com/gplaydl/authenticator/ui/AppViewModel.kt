@@ -6,7 +6,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.gplaydl.authenticator.BuildConfig
-import com.gplaydl.authenticator.auth.AasAuthenticator
 import com.gplaydl.authenticator.data.AppRelease
 import com.gplaydl.authenticator.data.AppState
 import com.gplaydl.authenticator.data.DispenserApi
@@ -16,20 +15,15 @@ import com.gplaydl.authenticator.data.PoolStats
 import com.gplaydl.authenticator.data.Prefs
 import com.gplaydl.authenticator.data.SharedAccount
 import com.gplaydl.authenticator.data.Visibility
-import com.gplaydl.authenticator.sync.ResyncScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Where the add-account flow currently is, so the UI can narrate it. */
 sealed interface SignInProgress {
     data object Idle : SignInProgress
-    data object Minting : SignInProgress
     data object Syncing : SignInProgress
-    data class Done(val account: SharedAccount) : SignInProgress
-    data class Failed(val message: String) : SignInProgress
 }
 
 data class UiState(
@@ -38,146 +32,175 @@ data class UiState(
     val accounts: List<SharedAccount> = emptyList(),
     val stats: PoolStats? = null,
     val release: AppRelease? = null,
+    val releaseChecked: Boolean = false,
     val refreshing: Boolean = false,
+    val accountsError: String? = null,
     val signIn: SignInProgress = SignInProgress.Idle,
     val busyAccountId: String? = null,
     val message: String? = null,
     val pairing: PairingCode? = null,
+    val pairingLoading: Boolean = false,
+    val pairingError: String? = null,
 )
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     private val prefs = Prefs(app)
     private val api = DispenserApi { prefs.current().dispenserUrl }
-    private val authenticator = AasAuthenticator()
 
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     init {
         viewModelScope.launch {
-            prefs.state.collect { app ->
+            prefs.state.collect { appState ->
                 val first = _state.value.loading
-                _state.update { it.copy(prefs = app, loading = false) }
-                if (first && app.isEnrolled) refresh()
+                _state.update { it.copy(prefs = appState, loading = false) }
+                if (first && appState.isEnrolled) refresh()
             }
         }
         viewModelScope.launch { loadPublicInfo() }
     }
 
-    // --- enrolment ---
-
-    /**
-     * Accepts the sharing terms and claims an identity on the dispenser. No
-     * email, no password: the device secret is the whole credential.
-     */
-    fun acceptConsentAndEnroll(onDone: () -> Unit) = launchCatching("could not reach the dispenser") {
-        val secret = prefs.deviceSecret()
-        val label = prefs.current().label
-        val result = api.enroll(secret, label, BuildConfig.CONSENT_VERSION)
-        prefs.setApiKey(result.apiKey)
-        prefs.setConsent(BuildConfig.CONSENT_VERSION)
-        ResyncScheduler.schedule(getApplication())
-        refresh()
-        onDone()
+    fun acceptConsentAndEnroll(onDone: (Boolean) -> Unit) = viewModelScope.launch {
+        val result = runCatching {
+            val secret = prefs.deviceSecret()
+            val appState = prefs.current()
+            val enrolled = api.enroll(secret, appState.label, BuildConfig.CONSENT_VERSION)
+            prefs.setApiKey(enrolled.apiKey)
+            prefs.setConsent(BuildConfig.CONSENT_VERSION)
+            refresh()
+        }
+        result.onFailure { note(it.userMessage("Could not reach the dispenser")) }
+        onDone(result.isSuccess)
     }
 
-    // --- add account ---
-
-    /**
-     * Turns the cookie captured by the sign-in WebView into a shared account.
-     * Minting and syncing are reported separately because minting is the step
-     * that can fail for reasons the user needs to understand.
-     */
-    fun completeSignIn(email: String, oauthToken: String) {
+    fun completeMintedSignIn(
+        email: String,
+        aasToken: String,
+        displayName: String,
+        visibility: Visibility,
+    ) {
         viewModelScope.launch {
-            _state.update { it.copy(signIn = SignInProgress.Minting) }
-            val minted = runCatching { authenticator.mint(email, oauthToken) }
-                .getOrElse { error ->
-                    _state.update { it.copy(signIn = SignInProgress.Failed(error.userMessage())) }
-                    return@launch
-                }
-            syncMinted(minted)
+            syncMinted(
+                MintedCredentials(email = email, aasToken = aasToken, displayName = displayName),
+                visibility,
+            )
         }
     }
 
-    private suspend fun syncMinted(minted: MintedCredentials) {
+    fun reportSignInFailure(message: String) {
+        _state.update { it.copy(signIn = SignInProgress.Idle, message = message) }
+    }
+
+    private suspend fun syncMinted(minted: MintedCredentials, visibility: Visibility) {
         _state.update { it.copy(signIn = SignInProgress.Syncing) }
-        val app = prefs.current()
-        val apiKey = app.apiKey ?: run {
-            _state.update { it.copy(signIn = SignInProgress.Failed("This device is not enrolled yet.")) }
+        val apiKey = prefs.current().apiKey ?: run {
+            _state.update {
+                it.copy(signIn = SignInProgress.Idle, message = "This device is not enrolled yet.")
+            }
             return
         }
-        val visibility = if (app.shareByDefault) Visibility.Public else Visibility.Private
         runCatching {
-            api.syncAccount(apiKey, minted.email, minted.aasToken, visibility, BuildConfig.CONSENT_VERSION)
+            api.syncAccount(
+                apiKey,
+                minted.email,
+                minted.aasToken,
+                visibility,
+                BuildConfig.CONSENT_VERSION,
+            )
         }.onSuccess { account ->
-            _state.update { it.copy(signIn = SignInProgress.Done(account)) }
+            _state.update {
+                it.copy(
+                    signIn = SignInProgress.Idle,
+                    message = if (account.isPublic) {
+                        "${account.email} is now helping the community."
+                    } else {
+                        "${account.email} was added as private."
+                    },
+                )
+            }
             refresh()
         }.onFailure { error ->
-            _state.update { it.copy(signIn = SignInProgress.Failed(error.userMessage())) }
+            _state.update {
+                it.copy(signIn = SignInProgress.Idle, message = error.userMessage())
+            }
         }
     }
 
-    fun dismissSignIn() = _state.update { it.copy(signIn = SignInProgress.Idle) }
-
-    // --- account management ---
-
     fun refresh() = viewModelScope.launch {
-        val apiKey = prefs.current().apiKey ?: return@launch
-        _state.update { it.copy(refreshing = true) }
-        val accounts = runCatching { api.accounts(apiKey) }.getOrNull()
-        _state.update { st ->
-            st.copy(refreshing = false, accounts = accounts ?: st.accounts)
+        val apiKey = prefs.current().apiKey
+        if (apiKey == null) {
+            _state.update { it.copy(refreshing = false) }
+            return@launch
         }
+        _state.update { it.copy(refreshing = true) }
+        runCatching { api.accounts(apiKey) }
+            .onSuccess { accounts ->
+                _state.update {
+                    it.copy(refreshing = false, accounts = accounts, accountsError = null)
+                }
+            }
+            .onFailure { error ->
+                _state.update {
+                    it.copy(
+                        refreshing = false,
+                        accountsError = error.userMessage("Could not refresh accounts"),
+                    )
+                }
+            }
         loadPublicInfo()
     }
 
     fun setVisibility(account: SharedAccount, share: Boolean) =
-        withAccountBusy(account.id, "could not update sharing") { apiKey ->
-            api.setVisibility(apiKey, account.id, if (share) Visibility.Public else Visibility.Private)
-            note(
-                if (share) "${account.email} is now helping the community pool"
-                else "${account.email} is private again",
+        withAccountBusy(account.id, "Could not update sharing") { apiKey ->
+            api.setVisibility(
+                apiKey,
+                account.id,
+                if (share) Visibility.Public else Visibility.Private,
             )
-        }
-
-    fun testAccount(account: SharedAccount) =
-        withAccountBusy(account.id, "could not test this account") { apiKey ->
-            val result = api.testAccount(apiKey, account.id)
             note(
-                if (result.success) "${account.email} works (${result.durationMs} ms)"
-                else "${account.email} failed: ${result.error}",
+                if (share) "${account.email} is now helping the community."
+                else "${account.email} is private again.",
             )
         }
 
     fun removeAccount(account: SharedAccount) =
-        withAccountBusy(account.id, "could not remove this account") { apiKey ->
+        withAccountBusy(account.id, "Could not remove this account") { apiKey ->
             api.deleteAccount(apiKey, account.id)
-            note("${account.email} removed from the dispenser")
+            note("${account.email} was removed.")
         }
 
-    // --- settings & pairing ---
-
-    fun requestPairingCode() = launchCatching("could not create a pairing code") {
-        val apiKey = prefs.current().apiKey ?: return@launchCatching
-        _state.update { it.copy(pairing = api.pairingCode(apiKey)) }
+    fun requestPairingCode() = viewModelScope.launch {
+        val apiKey = prefs.current().apiKey ?: return@launch
+        _state.update { it.copy(pairing = null, pairingLoading = true, pairingError = null) }
+        runCatching { api.pairingCode(apiKey) }
+            .onSuccess { pairing ->
+                _state.update {
+                    it.copy(pairing = pairing, pairingLoading = false, pairingError = null)
+                }
+            }
+            .onFailure { error ->
+                _state.update {
+                    it.copy(
+                        pairingLoading = false,
+                        pairingError = error.userMessage("Could not create a pairing code"),
+                    )
+                }
+            }
     }
 
-    fun setShareByDefault(share: Boolean) = viewModelScope.launch { prefs.setShareByDefault(share) }
-
-    fun setLabel(label: String) = viewModelScope.launch { prefs.setLabel(label.trim().take(64)) }
-
-    fun setDispenserUrl(url: String) = viewModelScope.launch {
-        prefs.setDispenserUrl(url)
-        note("Dispenser set to ${url.trimEnd('/')}")
-    }
-
-    /** Forgets this device's key. Accounts already shared stay in the pool. */
-    fun signOut() = viewModelScope.launch {
+    fun changeDispenserUrl(url: String, onDone: () -> Unit) = viewModelScope.launch {
+        prefs.setDispenserUrl(url.trimEnd('/'))
         prefs.signOut()
-        ResyncScheduler.cancel(getApplication())
         _state.update { it.copy(accounts = emptyList(), pairing = null) }
+        onDone()
+    }
+
+    fun disconnect(onDone: () -> Unit) = viewModelScope.launch {
+        prefs.signOut()
+        _state.update { it.copy(accounts = emptyList(), pairing = null) }
+        onDone()
     }
 
     fun dismissMessage() = _state.update { it.copy(message = null) }
@@ -185,29 +208,38 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private suspend fun loadPublicInfo() {
         val stats = runCatching { api.publicStats() }.getOrNull()
         val release = runCatching { api.latestRelease() }.getOrNull()
-        _state.update { it.copy(stats = stats ?: it.stats, release = release ?: it.release) }
+        _state.update {
+            it.copy(
+                stats = stats ?: it.stats,
+                release = release ?: it.release,
+                releaseChecked = true,
+            )
+        }
     }
 
     private fun note(message: String) = _state.update { it.copy(message = message) }
 
-    private fun launchCatching(fallback: String, block: suspend () -> Unit) = viewModelScope.launch {
-        runCatching { block() }.onFailure { note(it.userMessage(fallback)) }
+    private fun withAccountBusy(
+        id: String,
+        fallback: String,
+        block: suspend (String) -> Unit,
+    ) = viewModelScope.launch {
+        val apiKey = prefs.current().apiKey ?: return@launch
+        _state.update { it.copy(busyAccountId = id) }
+        runCatching { block(apiKey) }.onFailure { note(it.userMessage(fallback)) }
+        _state.update { it.copy(busyAccountId = null) }
+        refresh()
     }
-
-    private fun withAccountBusy(id: String, fallback: String, block: suspend (String) -> Unit) =
-        viewModelScope.launch {
-            val apiKey = prefs.current().apiKey ?: return@launch
-            _state.update { it.copy(busyAccountId = id) }
-            runCatching { block(apiKey) }.onFailure { note(it.userMessage(fallback)) }
-            _state.update { it.copy(busyAccountId = null) }
-            refresh()
-        }
 
     companion object {
         val Factory = object : ViewModelProvider.AndroidViewModelFactory() {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>, extras: androidx.lifecycle.viewmodel.CreationExtras): T {
-                val app = extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as Application
+            override fun <T : ViewModel> create(
+                modelClass: Class<T>,
+                extras: androidx.lifecycle.viewmodel.CreationExtras,
+            ): T {
+                val app =
+                    extras[ViewModelProvider.AndroidViewModelFactory.APPLICATION_KEY] as Application
                 return AppViewModel(app) as T
             }
         }

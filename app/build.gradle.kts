@@ -22,8 +22,8 @@ android {
         applicationId = "com.gplaydl.authenticator"
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 15
+        versionName = "1.1.0"
 
         buildConfigField("String", "DEFAULT_DISPENSER_URL", "\"https://dispenser.gplaydl.com\"")
         buildConfigField("String", "CONSENT_VERSION", "\"2026-07-27\"")
@@ -76,6 +76,10 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        // The Google sign-in screen is a plain View hierarchy copied from
+        // Aurora's Authenticator rather than Compose, so its WebView setup
+        // stays identical to the implementation that Google accepts.
+        viewBinding = true
     }
 
     packaging {
@@ -93,8 +97,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.datastore.preferences)
-    implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.okhttp)
+    implementation(libs.fuel)
     implementation(libs.kotlinx.serialization.json)
 
     implementation(platform(libs.androidx.compose.bom))
@@ -103,5 +107,6 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
+    testImplementation("junit:junit:4.13.2")
     debugImplementation(libs.androidx.compose.ui.tooling)
 }

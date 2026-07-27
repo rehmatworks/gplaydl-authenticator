@@ -1,5 +1,6 @@
 package com.gplaydl.authenticator.data
 
+import com.gplaydl.authenticator.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -39,9 +40,6 @@ class DispenserApi(private val baseUrlProvider: suspend () -> String) {
             apiKey = null,
         )
 
-    suspend fun me(apiKey: String): DispenserUser =
-        get<MeResponse>("/api/v1/me", apiKey).user
-
     suspend fun accounts(apiKey: String): List<SharedAccount> =
         get<AccountsResponse>("/api/v1/accounts", apiKey).accounts
 
@@ -68,16 +66,22 @@ class DispenserApi(private val baseUrlProvider: suspend () -> String) {
         request<AccountResponse>(
             method = "PATCH",
             path = "/api/v1/accounts/$id",
-            body = json.encodeToString(VisibilityRequest(visibility.wire)),
+            body = json.encodeToString(
+                VisibilityRequest(
+                    visibility = visibility.wire,
+                    consentVersion = if (visibility == Visibility.Public) {
+                        BuildConfig.CONSENT_VERSION
+                    } else {
+                        null
+                    },
+                ),
+            ),
             apiKey = apiKey,
         ).account
 
     suspend fun deleteAccount(apiKey: String, id: String) {
         request<StatusResponse>("DELETE", "/api/v1/accounts/$id", body = null, apiKey = apiKey)
     }
-
-    suspend fun testAccount(apiKey: String, id: String): TestResult =
-        post("/api/v1/accounts/$id/test", body = "{}", apiKey = apiKey)
 
     suspend fun pairingCode(apiKey: String): PairingCode =
         post("/api/v1/pair", body = "{}", apiKey = apiKey)

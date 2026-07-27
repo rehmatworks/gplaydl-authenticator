@@ -17,8 +17,7 @@ enum class Visibility(val wire: String) {
 @Serializable
 data class DispenserUser(
     val id: String,
-    val email: String = "",
-    val kind: String = "web",
+    val kind: String = "device",
     val label: String = "",
 )
 

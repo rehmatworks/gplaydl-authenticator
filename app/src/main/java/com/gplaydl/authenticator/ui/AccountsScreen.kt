@@ -3,6 +3,7 @@ package com.gplaydl.authenticator.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,18 +15,23 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material.icons.outlined.QrCode2
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.outlined.Web
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Badge
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -53,20 +59,29 @@ fun AccountsScreen(
     state: UiState,
     onAddAccount: () -> Unit,
     onToggleShare: (SharedAccount, Boolean) -> Unit,
-    onTest: (SharedAccount) -> Unit,
+    onReauthenticate: (SharedAccount) -> Unit,
     onRemove: (SharedAccount) -> Unit,
+    onRefresh: () -> Unit,
     onOpenPairing: () -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     var pendingRemoval by remember { mutableStateOf<SharedAccount?>(null) }
+    var pendingPublic by remember { mutableStateOf<SharedAccount?>(null) }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("gplaydl Authenticator") },
+                title = { Text("Accounts") },
                 actions = {
+                    IconButton(onClick = onRefresh, enabled = !state.refreshing) {
+                        if (state.refreshing) {
+                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Outlined.Refresh, contentDescription = "Refresh accounts")
+                        }
+                    }
                     IconButton(onClick = onOpenPairing) {
-                        Icon(Icons.Outlined.QrCode2, contentDescription = "Open on the web")
+                        Icon(Icons.Outlined.Web, contentDescription = "Web dashboard")
                     }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Outlined.Settings, contentDescription = "Settings")
@@ -78,7 +93,7 @@ fun AccountsScreen(
             ExtendedFloatingActionButton(
                 onClick = onAddAccount,
                 icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text("Add Google account") },
+                text = { Text("Add account") },
             )
         },
     ) { padding ->
@@ -86,27 +101,77 @@ fun AccountsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp,
-            ),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             item { PoolCard(state.stats) }
 
+            state.accountsError?.let { error ->
+                item {
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer,
+                        ),
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        ) {
+                            Icon(Icons.Outlined.ErrorOutline, contentDescription = null)
+                            Text(error, modifier = Modifier.weight(1f))
+                            TextButton(onClick = onRefresh) { Text("Retry") }
+                        }
+                    }
+                }
+            }
+
             if (state.accounts.isEmpty()) {
-                item { EmptyState(refreshing = state.refreshing) }
+                item {
+                    EmptyState(refreshing = state.refreshing, onAddAccount = onAddAccount)
+                }
             } else {
                 items(state.accounts, key = { it.id }) { account ->
                     AccountCard(
                         account = account,
                         busy = state.busyAccountId == account.id,
-                        onToggleShare = { onToggleShare(account, it) },
-                        onTest = { onTest(account) },
+                        onToggleShare = { share ->
+                            if (share) pendingPublic = account else onToggleShare(account, false)
+                        },
+                        onReauthenticate = { onReauthenticate(account) },
                         onRemove = { pendingRemoval = account },
                     )
                 }
             }
         }
+    }
+
+    pendingPublic?.let { account ->
+        AlertDialog(
+            onDismissRequest = { pendingPublic = null },
+            icon = { Icon(Icons.Outlined.Cloud, contentDescription = null) },
+            title = { Text("Share ${account.email}?") },
+            text = {
+                Text(
+                    "The dispenser may use this account to create short-lived Google Play " +
+                        "sessions for anyone. Use only a spare account with no payment methods, " +
+                        "purchases, or personal data.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onToggleShare(account, true)
+                        pendingPublic = null
+                    },
+                ) { Text("Share with community") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingPublic = null }) { Text("Keep private") }
+            },
+        )
     }
 
     pendingRemoval?.let { account ->
@@ -115,18 +180,20 @@ fun AccountsScreen(
             title = { Text("Remove ${account.email}?") },
             text = {
                 Text(
-                    "The token is deleted from the dispenser and the account leaves the " +
-                        "pool immediately. You can add it back by signing in again.",
+                    "Its token will be deleted from the dispenser. Already issued short-lived " +
+                        "Play sessions cannot be recalled.",
                 )
             },
             confirmButton = {
-                TextButton(onClick = {
-                    onRemove(account)
-                    pendingRemoval = null
-                }) { Text("Remove") }
+                TextButton(
+                    onClick = {
+                        onRemove(account)
+                        pendingRemoval = null
+                    },
+                ) { Text("Remove") }
             },
             dismissButton = {
-                TextButton(onClick = { pendingRemoval = null }) { Text("Keep") }
+                TextButton(onClick = { pendingRemoval = null }) { Text("Cancel") }
             },
         )
     }
@@ -138,17 +205,15 @@ private fun PoolCard(stats: PoolStats?) {
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
     ) {
-        Column(Modifier.padding(20.dp)) {
-            Text("Community pool", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                Metric("Accounts", stats?.publicAccounts)
-                Metric("Contributors", stats?.contributors)
-                Metric("Logins today", stats?.mints24h)
-            }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Metric("Community accounts", stats?.publicAccounts)
+            Metric("Contributors", stats?.contributors)
+            Metric("Sessions today", stats?.mints24h)
         }
     }
 }
@@ -158,13 +223,14 @@ private fun Metric(label: String, value: Long?) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             text = value?.toString() ?: "—",
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.titleLarge,
             color = MaterialTheme.colorScheme.primary,
         )
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
+            style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
         )
     }
 }
@@ -174,12 +240,22 @@ private fun AccountCard(
     account: SharedAccount,
     busy: Boolean,
     onToggleShare: (Boolean) -> Unit,
-    onTest: () -> Unit,
+    onReauthenticate: () -> Unit,
     onRemove: () -> Unit,
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    var menuOpen by remember { mutableStateOf(false) }
+    val needsSignIn = account.status != "active" || account.failureCount >= 5
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = if (needsSignIn) {
+            CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer)
+        } else {
+            CardDefaults.cardColors()
+        },
+    ) {
         Column(Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f)) {
                     Text(
                         text = account.email,
@@ -187,36 +263,81 @@ private fun AccountCard(
                         fontFamily = FontFamily.Monospace,
                     )
                     Spacer(Modifier.height(6.dp))
-                    Text(
-                        text = statusLine(account),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (account.isHealthy) {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        } else {
-                            MaterialTheme.colorScheme.error
-                        },
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Icon(
+                            imageVector = if (needsSignIn) {
+                                Icons.Outlined.ErrorOutline
+                            } else {
+                                Icons.Outlined.CheckCircle
+                            },
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                            tint = if (needsSignIn) {
+                                MaterialTheme.colorScheme.onTertiaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.primary
+                            },
+                        )
+                        Text(
+                            text = if (needsSignIn) {
+                                "Needs sign-in"
+                            } else {
+                                "Healthy · ${account.mintCount} successful sessions"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 }
                 if (busy) {
                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
+                } else {
+                    Box {
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(Icons.Outlined.MoreVert, contentDescription = "Account options")
+                        }
+                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Remove account") },
+                                leadingIcon = {
+                                    Icon(Icons.Outlined.Delete, contentDescription = null)
+                                },
+                                onClick = {
+                                    menuOpen = false
+                                    onRemove()
+                                },
+                            )
+                        }
+                    }
                 }
             }
 
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider()
-            Spacer(Modifier.height(4.dp))
+            if (needsSignIn) {
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    text = "Google is rejecting this token. Sign in again to refresh it.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                Spacer(Modifier.height(10.dp))
+                Button(onClick = onReauthenticate, enabled = !busy) {
+                    Text("Sign in again")
+                }
+            }
 
+            Spacer(Modifier.height(16.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = if (account.isPublic) "Shared with the community" else "Private to you",
-                        style = MaterialTheme.typography.bodyMedium,
+                        text = if (account.isPublic) "Community" else "Private",
+                        style = MaterialTheme.typography.bodyLarge,
                     )
                     Text(
                         text = if (account.isPublic) {
-                            "Anyone using gplaydl can download through this account."
+                            "Available to anonymous gplaydl users."
                         } else {
-                            "Only your API key can dispense this account."
+                            "Available only with your API key."
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -228,36 +349,16 @@ private fun AccountCard(
                     enabled = !busy,
                 )
             }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(onClick = onTest, enabled = !busy) {
-                    Icon(Icons.Outlined.Bolt, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(6.dp))
-                    Text("Test")
-                }
-                TextButton(onClick = onRemove, enabled = !busy) {
-                    Icon(Icons.Outlined.Delete, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.size(6.dp))
-                    Text("Remove")
-                }
-            }
         }
     }
 }
 
-private fun statusLine(account: SharedAccount): String = when (account.status) {
-    "active" -> "Healthy · used ${account.mintCount} times"
-    "flagged" -> "Google is rejecting this login — sign in again to refresh it"
-    "disabled" -> "Disabled on the dispenser"
-    else -> account.status
-}
-
 @Composable
-private fun EmptyState(refreshing: Boolean) {
+private fun EmptyState(refreshing: Boolean, onAddAccount: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 64.dp),
+            .padding(vertical = 52.dp),
         contentAlignment = Alignment.Center,
     ) {
         if (refreshing) {
@@ -267,11 +368,17 @@ private fun EmptyState(refreshing: Boolean) {
                 Text("No accounts yet", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Sign in with a spare Google account to start contributing.",
+                    text = "Add a spare Google account and decide whether it is Community or Private.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,
                 )
+                Spacer(Modifier.height(18.dp))
+                Button(onClick = onAddAccount) {
+                    Icon(Icons.Filled.Add, contentDescription = null)
+                    Spacer(Modifier.size(8.dp))
+                    Text("Add account")
+                }
             }
         }
     }
