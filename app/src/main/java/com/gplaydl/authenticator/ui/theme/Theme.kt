@@ -31,7 +31,11 @@ private val DarkScheme = darkColorScheme(
     onSurface = Color(0xFFE7EDF3),
     surfaceVariant = Slate,
     onSurfaceVariant = Color(0xFF9FB0C0),
-    outline = Color(0xFF2C3846),
+    // Outlines are drawn on filled cards, so they have to read against
+    // surfaceContainerHighest. The old tone was darker than it, which left
+    // anything outlined — switch tracks especially — with no visible edge.
+    outline = Color(0xFF7C8CA0),
+    outlineVariant = Color(0xFF2C3846),
     error = Color(0xFFFF8A80),
 )
 
