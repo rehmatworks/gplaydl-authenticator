@@ -102,10 +102,14 @@ Before the first tagged release, add these repository secrets:
 |--------|-------|
 | `SIGNING_KEYSTORE_BASE64` | `base64 -i gplaydl-authenticator.keystore` |
 | `SIGNING_STORE_PASSWORD` | from `signing.properties` |
-| `SIGNING_KEY_ALIAS` | from `signing.properties` |
 | `SIGNING_KEY_PASSWORD` | from `signing.properties` |
 | `DEPLOY_SSH_KEY` | the dispenser deploy key, same value the dispenser repo uses |
 | `DEPLOY_HOST`, `DEPLOY_USER`, `DEPLOY_KNOWN_HOSTS` | as in the dispenser repo |
+
+The key alias is not among them. It names a key inside the keystore rather than
+granting access to it, and holding it as a secret makes Actions redact `gplaydl`
+from every log line and blank any job output that contains it. The workflow sets
+`SIGNING_KEY_ALIAS` as a plain value instead.
 
 The workflow refuses to publish an APK that is not signed with the expected
 certificate (`EXPECTED_CERT_SHA256` in the workflow), since a different key

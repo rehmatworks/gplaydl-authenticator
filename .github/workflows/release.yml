@@ -16,6 +16,12 @@ env:
   # fails rather than shipping one.
   EXPECTED_CERT_SHA256: 3e923468ca1853f21685ad4a698b21259d9898ce9fff35acf65e57a6a548beee
 
+  # Deliberately not a secret. The alias names a key inside the keystore and is
+  # worthless without it, while registering "gplaydl" as a secret made Actions
+  # redact the project's own name from every log line and blank any job output
+  # containing it.
+  SIGNING_KEY_ALIAS: gplaydl
+
 jobs:
   build:
     name: Build signed APK
@@ -26,7 +32,6 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       version_code: ${{ steps.version.outputs.version_code }}
       sha256: ${{ steps.checksum.outputs.sha256 }}
-      apk_name: ${{ steps.checksum.outputs.apk_name }}
     steps:
       - uses: actions/checkout@v4
 
@@ -67,7 +72,6 @@ jobs:
         env:
           KEYSTORE_BASE64: ${{ secrets.SIGNING_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.SIGNING_STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.SIGNING_KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
         run: |
           if [ -z "$KEYSTORE_BASE64" ]; then
@@ -79,7 +83,7 @@ jobs:
           cat > signing.properties <<EOF
           storeFile=release.keystore
           storePassword=$STORE_PASSWORD
-          keyAlias=$KEY_ALIAS
+          keyAlias=$SIGNING_KEY_ALIAS
           keyPassword=$KEY_PASSWORD
           EOF
 
@@ -167,12 +171,29 @@ jobs:
       VERSION: ${{ needs.build.outputs.version }}
       VERSION_CODE: ${{ needs.build.outputs.version_code }}
       SHA256: ${{ needs.build.outputs.sha256 }}
-      APK: ${{ needs.build.outputs.apk_name }}
     steps:
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
           name: apk
+
+      # Derived here rather than carried over as a job output: Actions blanks an
+      # output whose value contains a secret, and the file name is built from
+      # the project name. Confirming the checksum also proves the artifact
+      # survived the round trip intact.
+      - name: Identify the downloaded APK
+        run: |
+          apk="gplaydl-authenticator-$VERSION.apk"
+          if [ ! -f "$apk" ]; then
+            echo "::error::$apk is missing from the build artifact" >&2
+            exit 1
+          fi
+          got=$(sha256sum "$apk" | cut -d' ' -f1)
+          if [ "$got" != "$SHA256" ]; then
+            echo "::error::$apk hashes to $got, expected $SHA256" >&2
+            exit 1
+          fi
+          echo "APK=$apk" >> "$GITHUB_ENV"
 
       - name: Set up SSH
         run: |
