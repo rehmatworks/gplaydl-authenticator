@@ -90,11 +90,14 @@ fun AccountsScreen(
             )
         },
         floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = onAddAccount,
-                icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-                text = { Text("Add account") },
-            )
+            // The empty state carries its own centred call to action.
+            if (state.accounts.isNotEmpty()) {
+                ExtendedFloatingActionButton(
+                    onClick = onAddAccount,
+                    icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                    text = { Text("Add account") },
+                )
+            }
         },
     ) { padding ->
         LazyColumn(

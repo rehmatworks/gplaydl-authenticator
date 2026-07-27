@@ -22,8 +22,8 @@ android {
         applicationId = "com.gplaydl.authenticator"
         minSdk = 24
         targetSdk = 36
-        versionCode = 15
-        versionName = "1.1.0"
+        versionCode = 16
+        versionName = "1.1.1"
 
         buildConfigField("String", "DEFAULT_DISPENSER_URL", "\"https://dispenser.gplaydl.com\"")
         buildConfigField("String", "CONSENT_VERSION", "\"2026-07-27\"")

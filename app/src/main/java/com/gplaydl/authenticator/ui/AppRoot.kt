@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Lock
@@ -264,6 +265,7 @@ private fun AccountIntentDialog(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(Icons.Outlined.Cloud, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
                     Text("Share with community")
                 }
                 Text(
@@ -277,6 +279,7 @@ private fun AccountIntentDialog(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Icon(Icons.Outlined.Lock, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
                     Text("Keep private")
                 }
                 Text(
