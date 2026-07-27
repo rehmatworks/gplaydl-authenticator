@@ -57,14 +57,6 @@ data class PairingCode(
 )
 
 @Serializable
-data class PoolStats(
-    @SerialName("publicAccounts") val publicAccounts: Long = 0,
-    @SerialName("mints24h") val mints24h: Long = 0,
-    @SerialName("totalMints") val totalMints: Long = 0,
-    @SerialName("contributors") val contributors: Long = 0,
-)
-
-@Serializable
 data class AppRelease(
     val version: String = "",
     val versionCode: Int = 0,

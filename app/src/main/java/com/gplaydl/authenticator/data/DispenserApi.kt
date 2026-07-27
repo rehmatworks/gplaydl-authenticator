@@ -86,8 +86,6 @@ class DispenserApi(private val baseUrlProvider: suspend () -> String) {
     suspend fun pairingCode(apiKey: String): PairingCode =
         post("/api/v1/pair", body = "{}", apiKey = apiKey)
 
-    suspend fun publicStats(): PoolStats = get("/api/v1/public-stats", apiKey = null)
-
     suspend fun latestRelease(): AppRelease = get("/api/v1/app/latest", apiKey = null)
 
     // --- plumbing ---

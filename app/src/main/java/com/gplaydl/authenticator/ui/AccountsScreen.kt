@@ -50,7 +50,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.gplaydl.authenticator.data.PoolStats
 import com.gplaydl.authenticator.data.SharedAccount
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -107,8 +106,6 @@ fun AccountsScreen(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 96.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { PoolCard(state.stats) }
-
             state.accountsError?.let { error ->
                 item {
                     Card(
@@ -198,42 +195,6 @@ fun AccountsScreen(
             dismissButton = {
                 TextButton(onClick = { pendingRemoval = null }) { Text("Cancel") }
             },
-        )
-    }
-}
-
-@Composable
-private fun PoolCard(stats: PoolStats?) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 18.dp, vertical = 16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Metric("Community accounts", stats?.publicAccounts)
-            Metric("Contributors", stats?.contributors)
-            Metric("Sessions today", stats?.mints24h)
-        }
-    }
-}
-
-@Composable
-private fun Metric(label: String, value: Long?) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = value?.toString() ?: "—",
-            style = MaterialTheme.typography.titleLarge,
-            color = MaterialTheme.colorScheme.primary,
-        )
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
         )
     }
 }

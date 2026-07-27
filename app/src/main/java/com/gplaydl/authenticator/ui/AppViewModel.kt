@@ -11,7 +11,6 @@ import com.gplaydl.authenticator.data.AppState
 import com.gplaydl.authenticator.data.DispenserApi
 import com.gplaydl.authenticator.data.MintedCredentials
 import com.gplaydl.authenticator.data.PairingCode
-import com.gplaydl.authenticator.data.PoolStats
 import com.gplaydl.authenticator.data.Prefs
 import com.gplaydl.authenticator.data.SharedAccount
 import com.gplaydl.authenticator.data.Visibility
@@ -30,7 +29,6 @@ data class UiState(
     val loading: Boolean = true,
     val prefs: AppState = AppState(),
     val accounts: List<SharedAccount> = emptyList(),
-    val stats: PoolStats? = null,
     val release: AppRelease? = null,
     val releaseChecked: Boolean = false,
     val refreshing: Boolean = false,
@@ -206,11 +204,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun dismissMessage() = _state.update { it.copy(message = null) }
 
     private suspend fun loadPublicInfo() {
-        val stats = runCatching { api.publicStats() }.getOrNull()
         val release = runCatching { api.latestRelease() }.getOrNull()
         _state.update {
             it.copy(
-                stats = stats ?: it.stats,
                 release = release ?: it.release,
                 releaseChecked = true,
             )
