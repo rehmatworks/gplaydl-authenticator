@@ -69,7 +69,7 @@ fun PairScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Web dashboard") },
+                title = { Text("Link gplaydl") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -86,8 +86,8 @@ fun PairScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Text(
-                text = "Open the dashboard in a browser and enter this one-time code. " +
-                    "No email or password is required.",
+                text = "Run gplaydl link on your computer and type in this one-time code. " +
+                    "The same code also opens the web dashboard, with no email or password.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,

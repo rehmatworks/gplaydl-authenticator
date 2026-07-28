@@ -37,7 +37,7 @@ consent  ->  enrol device  ->  Google sign-in  ->  mint AAS token  ->  sync
 | Consent | Explains sharing and enrols the device |
 | Accounts | Per-account visibility switch, health, re-sign-in and remove |
 | Sign in | Google's embedded setup WebView |
-| Open on the web | One-shot pairing code for reaching the dashboard in a browser |
+| Link gplaydl | One-shot pairing code that links the gplaydl CLI or opens the dashboard in a browser |
 | Settings | Update check, API key, dispenser URL, disconnect |
 
 ## Building

@@ -81,7 +81,7 @@ fun AccountsScreen(
                         }
                     }
                     IconButton(onClick = onOpenPairing) {
-                        Icon(Icons.Outlined.Web, contentDescription = "Web dashboard")
+                        Icon(Icons.Outlined.Web, contentDescription = "Link gplaydl")
                     }
                     IconButton(onClick = onOpenSettings) {
                         Icon(Icons.Outlined.Settings, contentDescription = "Settings")
