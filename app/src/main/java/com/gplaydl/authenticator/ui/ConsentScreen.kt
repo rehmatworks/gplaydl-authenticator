@@ -12,9 +12,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Groups
+import androidx.compose.material.icons.outlined.AccountCircle
+import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -63,7 +63,7 @@ fun ConsentScreen(
         Spacer(Modifier.height(28.dp))
 
         ConsentPoint(
-            icon = Icons.Outlined.Groups,
+            icon = Icons.Outlined.ErrorOutline,
             title = "Use a spare account",
             body = "Prefer a throwaway over your primary, work, or payment-linked account. " +
                 "Google may revoke unofficial client access.",
@@ -75,15 +75,14 @@ fun ConsentScreen(
                 "Google Play apps as that account, and is encrypted at rest.",
         )
         ConsentPoint(
-            icon = Icons.Outlined.Visibility,
+            icon = Icons.Outlined.AccountCircle,
             title = "Your account stays yours",
             body = "Accounts you add are private to you and only ever power your own gplaydl " +
                 "downloads. You can remove one anytime. Passwords, 2FA codes, and cookies are " +
                 "never sent to the dispenser.",
         )
 
-        Spacer(Modifier.height(8.dp))
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(24.dp))
 
         Button(
             onClick = onAccept,

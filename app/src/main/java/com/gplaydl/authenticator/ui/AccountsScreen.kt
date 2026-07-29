@@ -18,15 +18,12 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.ErrorOutline
-import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
@@ -163,7 +160,6 @@ private fun AccountCard(
     onReauthenticate: () -> Unit,
     onRemove: () -> Unit,
 ) {
-    var menuOpen by remember { mutableStateOf(false) }
     val needsSignIn = account.status != "active" || account.failureCount >= 5
 
     Card(
@@ -214,22 +210,8 @@ private fun AccountCard(
                 if (busy) {
                     CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp)
                 } else {
-                    Box {
-                        IconButton(onClick = { menuOpen = true }) {
-                            Icon(Icons.Outlined.MoreVert, contentDescription = "Account options")
-                        }
-                        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                            DropdownMenuItem(
-                                text = { Text("Remove account") },
-                                leadingIcon = {
-                                    Icon(Icons.Outlined.Delete, contentDescription = null)
-                                },
-                                onClick = {
-                                    menuOpen = false
-                                    onRemove()
-                                },
-                            )
-                        }
+                    IconButton(onClick = onRemove) {
+                        Icon(Icons.Outlined.Delete, contentDescription = "Remove ${account.email}")
                     }
                 }
             }
