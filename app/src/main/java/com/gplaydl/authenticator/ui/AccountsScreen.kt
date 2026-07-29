@@ -16,7 +16,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.CheckCircle
-import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.MoreVert
@@ -34,8 +33,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -56,13 +53,11 @@ import com.gplaydl.authenticator.data.SharedAccount
 fun AccountsScreen(
     state: UiState,
     onAddAccount: () -> Unit,
-    onToggleShare: (SharedAccount, Boolean) -> Unit,
     onReauthenticate: (SharedAccount) -> Unit,
     onRemove: (SharedAccount) -> Unit,
     onRefresh: () -> Unit,
 ) {
     var pendingRemoval by remember { mutableStateOf<SharedAccount?>(null) }
-    var pendingPublic by remember { mutableStateOf<SharedAccount?>(null) }
 
     Scaffold(
         topBar = {
@@ -128,41 +123,12 @@ fun AccountsScreen(
                     AccountCard(
                         account = account,
                         busy = state.busyAccountId == account.id,
-                        onToggleShare = { share ->
-                            if (share) pendingPublic = account else onToggleShare(account, false)
-                        },
                         onReauthenticate = { onReauthenticate(account) },
                         onRemove = { pendingRemoval = account },
                     )
                 }
             }
         }
-    }
-
-    pendingPublic?.let { account ->
-        AlertDialog(
-            onDismissRequest = { pendingPublic = null },
-            icon = { Icon(Icons.Outlined.Cloud, contentDescription = null) },
-            title = { Text("Share ${account.email}?") },
-            text = {
-                Text(
-                    "The dispenser may use this account to create short-lived Google Play " +
-                        "sessions for anyone. Use only a spare account with no payment methods, " +
-                        "purchases, or personal data.",
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        onToggleShare(account, true)
-                        pendingPublic = null
-                    },
-                ) { Text("Share with community") }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingPublic = null }) { Text("Keep private") }
-            },
-        )
     }
 
     pendingRemoval?.let { account ->
@@ -194,7 +160,6 @@ fun AccountsScreen(
 private fun AccountCard(
     account: SharedAccount,
     busy: Boolean,
-    onToggleShare: (Boolean) -> Unit,
     onReauthenticate: () -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -240,7 +205,7 @@ private fun AccountCard(
                             text = if (needsSignIn) {
                                 "Needs sign-in"
                             } else {
-                                "Healthy · ${account.mintCount} successful sessions"
+                                "Healthy · ${account.mintCount} downloads served"
                             },
                             style = MaterialTheme.typography.bodySmall,
                         )
@@ -280,36 +245,6 @@ private fun AccountCard(
                     Text("Sign in again")
                 }
             }
-
-            Spacer(Modifier.height(16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = if (account.isPublic) "Community" else "Private",
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
-                    Text(
-                        text = if (account.isPublic) {
-                            "Available to anonymous gplaydl users."
-                        } else {
-                            "Available only with your API key."
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                Switch(
-                    checked = account.isPublic,
-                    onCheckedChange = onToggleShare,
-                    enabled = !busy,
-                    colors = SwitchDefaults.colors(
-                        // An unchecked track defaults to the same token that
-                        // fills the card behind it, so let it sit back to the
-                        // page colour instead of merging into the card.
-                        uncheckedTrackColor = MaterialTheme.colorScheme.surface,
-                    ),
-                )
-            }
         }
     }
 }
@@ -329,7 +264,7 @@ private fun EmptyState(refreshing: Boolean, onAddAccount: () -> Unit) {
                 Text("No accounts yet", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Add a spare Google account and decide whether it is Community or Private.",
+                    text = "Add a spare Google account to download with. It stays private to you.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center,

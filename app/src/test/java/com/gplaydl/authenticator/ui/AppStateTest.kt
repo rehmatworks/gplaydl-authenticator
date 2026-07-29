@@ -1,18 +1,9 @@
 package com.gplaydl.authenticator.ui
 
-import com.gplaydl.authenticator.data.Visibility
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
 class AppStateTest {
-
-    @Test
-    fun visibilityDefaultsToPrivate() {
-        assertEquals(Visibility.Public, Visibility.from("public"))
-        assertEquals(Visibility.Private, Visibility.from("private"))
-        assertEquals(Visibility.Private, Visibility.from(null))
-        assertEquals(Visibility.Private, Visibility.from("unexpected"))
-    }
 
     @Test
     fun pairingCountdownHandlesValidExpiredAndInvalidValues() {

@@ -1,6 +1,5 @@
 package com.gplaydl.authenticator.data
 
-import com.gplaydl.authenticator.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
@@ -47,37 +46,13 @@ class DispenserApi(private val baseUrlProvider: suspend () -> String) {
         apiKey: String,
         email: String,
         aasToken: String,
-        visibility: Visibility,
-        consentVersion: String,
     ): SharedAccount = post<AccountResponse>(
         path = "/api/v1/accounts",
         body = json.encodeToString(
-            SyncAccountRequest(
-                email = email,
-                aasToken = aasToken,
-                visibility = visibility.wire,
-                consentVersion = consentVersion,
-            ),
+            SyncAccountRequest(email = email, aasToken = aasToken),
         ),
         apiKey = apiKey,
     ).account
-
-    suspend fun setVisibility(apiKey: String, id: String, visibility: Visibility): SharedAccount =
-        request<AccountResponse>(
-            method = "PATCH",
-            path = "/api/v1/accounts/$id",
-            body = json.encodeToString(
-                VisibilityRequest(
-                    visibility = visibility.wire,
-                    consentVersion = if (visibility == Visibility.Public) {
-                        BuildConfig.CONSENT_VERSION
-                    } else {
-                        null
-                    },
-                ),
-            ),
-            apiKey = apiKey,
-        ).account
 
     suspend fun deleteAccount(apiKey: String, id: String) {
         request<StatusResponse>("DELETE", "/api/v1/accounts/$id", body = null, apiKey = apiKey)

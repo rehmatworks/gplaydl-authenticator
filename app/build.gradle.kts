@@ -16,8 +16,8 @@ val signingProps = Properties().apply {
 
 // Published builds are tagged, and the release workflow derives these from the
 // tag. The fallbacks only describe a locally built APK.
-val appVersionName = (findProperty("appVersionName") as String?) ?: "1.3.0"
-val appVersionCode = (findProperty("appVersionCode") as String?)?.toInt() ?: 19
+val appVersionName = (findProperty("appVersionName") as String?) ?: "2.0.0"
+val appVersionCode = (findProperty("appVersionCode") as String?)?.toInt() ?: 20
 
 android {
     namespace = "com.gplaydl.authenticator"

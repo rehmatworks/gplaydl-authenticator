@@ -2,10 +2,7 @@ package com.gplaydl.authenticator.ui
 
 import android.app.Activity
 import android.content.ClipData
-import android.content.ClipDescription
 import android.content.Intent
-import android.os.Build
-import android.os.PersistableBundle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
@@ -17,21 +14,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountCircle
-import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.Link
-import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -58,7 +50,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.gplaydl.authenticator.auth.GoogleLoginActivity
-import com.gplaydl.authenticator.data.Visibility
 import kotlinx.coroutines.launch
 
 private object Routes {
@@ -76,8 +67,6 @@ fun AppRoot(viewModel: AppViewModel = viewModel(factory = AppViewModel.Factory))
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     val clipboard = LocalClipboard.current
-    var showAccountIntent by remember { mutableStateOf(false) }
-    var pendingVisibility by remember { mutableStateOf<Visibility?>(null) }
 
     fun openUrl(url: String) {
         runCatching {
@@ -91,35 +80,29 @@ fun AppRoot(viewModel: AppViewModel = viewModel(factory = AppViewModel.Factory))
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
         if (result.resultCode != Activity.RESULT_OK) {
-            pendingVisibility = null
             return@rememberLauncherForActivityResult
         }
         val data = result.data
         if (data == null) {
-            pendingVisibility = null
             viewModel.reportSignInFailure("Google sign-in returned no result.")
             return@rememberLauncherForActivityResult
         }
         val error = data.getStringExtra(GoogleLoginActivity.AUTH_ERROR)
         if (!error.isNullOrBlank()) {
-            pendingVisibility = null
             viewModel.reportSignInFailure(error)
             return@rememberLauncherForActivityResult
         }
         val email = data.getStringExtra(GoogleLoginActivity.AUTH_EMAIL).orEmpty()
         val aasToken = data.getStringExtra(GoogleLoginActivity.AUTH_AAS_TOKEN).orEmpty()
         val name = data.getStringExtra(GoogleLoginActivity.AUTH_NAME).orEmpty()
-        val visibility = pendingVisibility ?: Visibility.Private
-        pendingVisibility = null
         if (email.isBlank() || aasToken.isBlank()) {
             viewModel.reportSignInFailure("Google sign-in did not return a complete account token.")
         } else {
-            viewModel.completeMintedSignIn(email, aasToken, name, visibility)
+            viewModel.completeMintedSignIn(email, aasToken, name)
         }
     }
 
-    fun launchSignIn(visibility: Visibility) {
-        pendingVisibility = visibility
+    fun launchSignIn() {
         signIn.launch(Intent(context, GoogleLoginActivity::class.java))
     }
 
@@ -203,11 +186,8 @@ fun AppRoot(viewModel: AppViewModel = viewModel(factory = AppViewModel.Factory))
             composable(Routes.ACCOUNTS) {
                 AccountsScreen(
                     state = state,
-                    onAddAccount = { showAccountIntent = true },
-                    onToggleShare = viewModel::setVisibility,
-                    onReauthenticate = { account ->
-                        launchSignIn(Visibility.from(account.visibility))
-                    },
+                    onAddAccount = { launchSignIn() },
+                    onReauthenticate = { launchSignIn() },
                     onRemove = viewModel::removeAccount,
                     onRefresh = viewModel::refresh,
                 )
@@ -243,12 +223,6 @@ fun AppRoot(viewModel: AppViewModel = viewModel(factory = AppViewModel.Factory))
                         }
                     },
                     onOpenUrl = ::openUrl,
-                    onCopyApiKey = { key ->
-                        clipboard.nativeClipboard.setPrimaryClip(
-                            sensitiveClip("gplaydl API key", key),
-                        )
-                        scope.launch { snackbar.showSnackbar("API key copied. Keep it private.") }
-                    },
                     onDisconnect = {
                         viewModel.disconnect {
                             navController.navigate(Routes.CONSENT) {
@@ -262,16 +236,6 @@ fun AppRoot(viewModel: AppViewModel = viewModel(factory = AppViewModel.Factory))
                 )
             }
         }
-    }
-
-    if (showAccountIntent) {
-        AccountIntentDialog(
-            onDismiss = { showAccountIntent = false },
-            onSelect = { visibility ->
-                showAccountIntent = false
-                launchSignIn(visibility)
-            },
-        )
     }
 
     if (state.signIn is SignInProgress.Syncing) {
@@ -292,67 +256,6 @@ private fun RowScope.Tab(
         onClick = { onSwitch(route) },
         icon = { Icon(icon, contentDescription = null) },
         label = { Text(label) },
-    )
-}
-
-private fun sensitiveClip(label: String, text: String): ClipData =
-    ClipData.newPlainText(label, text).also { clip ->
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            clip.description.extras = PersistableBundle().apply {
-                putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
-            }
-        }
-    }
-
-@Composable
-private fun AccountIntentDialog(
-    onDismiss: () -> Unit,
-    onSelect: (Visibility) -> Unit,
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("How should this account be used?") },
-        text = {
-            Column {
-                Text(
-                    "Choose before Google sign-in. Use only a spare account with no payments, " +
-                        "purchases, work data, or personal mail.",
-                )
-                Spacer(Modifier.height(20.dp))
-                Button(
-                    onClick = { onSelect(Visibility.Public) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Outlined.Cloud, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Share with community")
-                }
-                Text(
-                    text = "Anyone using this dispenser may receive Play sessions from it.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 6.dp, bottom = 18.dp),
-                )
-                OutlinedButton(
-                    onClick = { onSelect(Visibility.Private) },
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Icon(Icons.Outlined.Lock, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text("Keep private")
-                }
-                Text(
-                    text = "Only requests using this app's API key can use it.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(top = 6.dp),
-                )
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
     )
 }
 

@@ -3,17 +3,6 @@ package com.gplaydl.authenticator.data
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/** Visibility of a shared Google account, mirroring the dispenser's enum. */
-enum class Visibility(val wire: String) {
-    Public("public"),
-    Private("private"),
-    ;
-
-    companion object {
-        fun from(wire: String?) = if (wire == "public") Public else Private
-    }
-}
-
 @Serializable
 data class DispenserUser(
     val id: String,
@@ -31,7 +20,6 @@ data class EnrollResponse(
 data class SharedAccount(
     val id: String,
     val email: String,
-    val visibility: String,
     val status: String,
     val source: String = "app",
     val mintCount: Long = 0,
@@ -39,7 +27,6 @@ data class SharedAccount(
     val lastUsedAt: String? = null,
     val lastSyncedAt: String? = null,
 ) {
-    val isPublic: Boolean get() = visibility == "public"
     val isHealthy: Boolean get() = status == "active"
 }
 

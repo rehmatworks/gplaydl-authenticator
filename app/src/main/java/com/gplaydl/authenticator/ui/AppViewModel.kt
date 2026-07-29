@@ -13,7 +13,6 @@ import com.gplaydl.authenticator.data.MintedCredentials
 import com.gplaydl.authenticator.data.PairingCode
 import com.gplaydl.authenticator.data.Prefs
 import com.gplaydl.authenticator.data.SharedAccount
-import com.gplaydl.authenticator.data.Visibility
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -77,12 +76,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         email: String,
         aasToken: String,
         displayName: String,
-        visibility: Visibility,
     ) {
         viewModelScope.launch {
             syncMinted(
                 MintedCredentials(email = email, aasToken = aasToken, displayName = displayName),
-                visibility,
             )
         }
     }
@@ -91,7 +88,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         _state.update { it.copy(signIn = SignInProgress.Idle, message = message) }
     }
 
-    private suspend fun syncMinted(minted: MintedCredentials, visibility: Visibility) {
+    private suspend fun syncMinted(minted: MintedCredentials) {
         _state.update { it.copy(signIn = SignInProgress.Syncing) }
         val apiKey = prefs.current().apiKey ?: run {
             _state.update {
@@ -100,22 +97,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             return
         }
         runCatching {
-            api.syncAccount(
-                apiKey,
-                minted.email,
-                minted.aasToken,
-                visibility,
-                BuildConfig.CONSENT_VERSION,
-            )
+            api.syncAccount(apiKey, minted.email, minted.aasToken)
         }.onSuccess { account ->
             _state.update {
                 it.copy(
                     signIn = SignInProgress.Idle,
-                    message = if (account.isPublic) {
-                        "${account.email} is now helping the community."
-                    } else {
-                        "${account.email} was added as private."
-                    },
+                    message = "${account.email} was added.",
                 )
             }
             refresh()
@@ -149,19 +136,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
             }
         loadPublicInfo()
     }
-
-    fun setVisibility(account: SharedAccount, share: Boolean) =
-        withAccountBusy(account.id, "Could not update sharing") { apiKey ->
-            api.setVisibility(
-                apiKey,
-                account.id,
-                if (share) Visibility.Public else Visibility.Private,
-            )
-            note(
-                if (share) "${account.email} is now helping the community."
-                else "${account.email} is private again.",
-            )
-        }
 
     fun removeAccount(account: SharedAccount) =
         withAccountBusy(account.id, "Could not remove this account") { apiKey ->

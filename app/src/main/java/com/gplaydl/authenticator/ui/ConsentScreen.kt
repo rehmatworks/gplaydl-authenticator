@@ -30,8 +30,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
 /**
- * First-run screen. Sharing a Google account with strangers is a real decision,
- * so it is spelled out in full before anything is sent anywhere.
+ * First-run screen. Handing a Google credential to any server is a real
+ * decision, so it is spelled out in full before anything is sent anywhere.
  */
 @Composable
 fun ConsentScreen(
@@ -65,7 +65,7 @@ fun ConsentScreen(
         ConsentPoint(
             icon = Icons.Outlined.Groups,
             title = "Use a spare account",
-            body = "Do not use your primary, work, payment-linked, or purchased-app account. " +
+            body = "Prefer a throwaway over your primary, work, or payment-linked account. " +
                 "Google may revoke unofficial client access.",
         )
         ConsentPoint(
@@ -76,9 +76,9 @@ fun ConsentScreen(
         )
         ConsentPoint(
             icon = Icons.Outlined.Visibility,
-            title = "You choose for every account",
-            body = "Before Google sign-in, choose Community or Private. You can make an " +
-                "account private or delete it later. Passwords, 2FA codes, and cookies are " +
+            title = "Your account stays yours",
+            body = "Accounts you add are private to you and only ever power your own gplaydl " +
+                "downloads. You can remove one anytime. Passwords, 2FA codes, and cookies are " +
                 "never sent to the dispenser.",
         )
 

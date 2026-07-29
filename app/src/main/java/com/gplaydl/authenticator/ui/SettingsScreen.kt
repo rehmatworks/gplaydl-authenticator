@@ -1,7 +1,6 @@
 package com.gplaydl.authenticator.ui
 
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,13 +11,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
-import androidx.compose.material.icons.outlined.ContentCopy
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -36,8 +30,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.gplaydl.authenticator.BuildConfig
 import com.gplaydl.authenticator.data.AppRelease
@@ -51,13 +43,11 @@ fun SettingsScreen(
     releaseChecked: Boolean,
     onDispenserUrlChange: (String) -> Unit,
     onOpenUrl: (String) -> Unit,
-    onCopyApiKey: (String) -> Unit,
     onDisconnect: () -> Unit,
     // Null when the screen lives in the tab bar and needs no way back.
     onBack: (() -> Unit)?,
 ) {
     var url by remember(prefs.dispenserUrl) { mutableStateOf(prefs.dispenserUrl) }
-    var showApiKey by remember { mutableStateOf(false) }
     var showAdvanced by remember { mutableStateOf(!prefs.isEnrolled) }
     var pendingUrl by remember { mutableStateOf<String?>(null) }
     var confirmDisconnect by remember { mutableStateOf(false) }
@@ -115,55 +105,11 @@ fun SettingsScreen(
                 )
             }
 
-            if (prefs.isEnrolled && prefs.apiKey != null) {
-                Spacer(Modifier.height(28.dp))
-                Section("Private gplaydl downloads")
-                Text(
-                    text = "Use this API key only on devices you trust. It gives access to your " +
-                        "private accounts and must not be shared publicly.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(10.dp))
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    ),
-                ) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp),
-                    ) {
-                        Text(
-                            text = if (showApiKey) prefs.apiKey else "••••••••••••••••••••••••",
-                            fontFamily = FontFamily.Monospace,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
-                        )
-                        IconButton(onClick = { showApiKey = !showApiKey }) {
-                            Icon(
-                                imageVector = if (showApiKey) {
-                                    Icons.Outlined.VisibilityOff
-                                } else {
-                                    Icons.Outlined.Visibility
-                                },
-                                contentDescription = if (showApiKey) "Hide API key" else "Show API key",
-                            )
-                        }
-                        IconButton(onClick = { onCopyApiKey(prefs.apiKey) }) {
-                            Icon(Icons.Outlined.ContentCopy, contentDescription = "Copy API key")
-                        }
-                    }
-                }
-            }
-
             Spacer(Modifier.height(28.dp))
             Section("Privacy and terms")
             Text(
-                text = "Review what the dispenser stores, how account tokens are used, and the " +
-                    "risks of unofficial Google Play access.",
+                text = "Review what the dispenser stores, how your account tokens are used, and " +
+                    "the risks of unofficial Google Play access.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -172,7 +118,7 @@ fun SettingsScreen(
                 Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null)
             }
             TextButton(onClick = { onOpenUrl("${prefs.dispenserUrl}/#terms") }) {
-                Text("Sharing terms")
+                Text("Terms")
                 Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null)
             }
 

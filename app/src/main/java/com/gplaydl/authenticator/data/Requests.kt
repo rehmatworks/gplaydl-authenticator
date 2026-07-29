@@ -13,14 +13,6 @@ data class EnrollRequest(
 data class SyncAccountRequest(
     val email: String,
     val aasToken: String,
-    val visibility: String,
-    val consentVersion: String,
-)
-
-@Serializable
-data class VisibilityRequest(
-    val visibility: String,
-    val consentVersion: String? = null,
 )
 
 @Serializable
