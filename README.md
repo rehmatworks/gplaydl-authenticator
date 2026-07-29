@@ -1,12 +1,13 @@
 # gplaydl Authenticator
 
 Android app that signs into a Google account, mints a long-lived AAS token, and
-syncs it to a [gplaydl dispenser](https://dispenser.gplaydl.com) so the
-community can keep downloading from Google Play.
+syncs it to a [gplaydl dispenser](https://dispenser.gplaydl.com) so your own
+[gplaydl](https://github.com/rehmatworks/gplaydl) can download from Google Play.
 
-It replaces the copy-the-token-by-hand workflow: the app enrols itself with the
-dispenser on first launch, so there is no signup, no password and no manual
-paste step.
+Accounts you add are private to you: the dispenser only ever uses them to serve
+your own linked gplaydl. It replaces the copy-the-token-by-hand workflow, the
+app enrols itself with the dispenser on first launch, so there is no signup, no
+password and no manual paste step.
 
 ## How it works
 
@@ -18,27 +19,27 @@ consent  ->  enrol device  ->  Google sign-in  ->  mint AAS token  ->  sync
 1. **Consent.** The first screen spells out exactly what is uploaded (the token
    and the account's email address) and what is not (password, 2FA, cookies).
    The wording is versioned in `CONSENT_VERSION` and that version is recorded
-   server-side against both the device and every shared account.
+   server-side against the device.
 2. **Enrolment.** `POST /api/v1/devices/enroll` exchanges a locally generated
    32-byte device secret for an API key. The secret never leaves the app's
    private storage and doubles as the recovery credential, so re-installing
-   recovers the same identity instead of orphaning shared accounts.
+   recovers the same identity instead of orphaning its accounts.
 3. **Sign-in.** A WebView loads `accounts.google.com/EmbeddedSetup`, the only
    flow that yields an `oauth_token` cookie an unofficial Play client can use.
 4. **Mint.** That cookie is POSTed to `android.clients.google.com/auth` with
    `service=ac2dm`, which returns the `aas_et/...` token.
 5. **Sync.** `POST /api/v1/accounts` stores the token encrypted on the
-   dispenser, public or private depending on the user's choice.
+   dispenser, private to the owner.
 
 ## Screens
 
 | Screen | Purpose |
 |--------|---------|
-| Consent | Explains sharing and enrols the device |
-| Accounts | Per-account visibility switch, health, re-sign-in and remove |
+| Consent | Explains what is stored and enrols the device |
+| Accounts | Account health, re-sign-in and remove |
 | Sign in | Google's embedded setup WebView |
 | Link gplaydl | One-shot pairing code that links the gplaydl CLI or opens the dashboard in a browser |
-| Settings | Update check, API key, dispenser URL, disconnect |
+| Settings | Update check, dispenser URL, disconnect |
 
 ## Building
 
@@ -125,11 +126,13 @@ release. See the header of that script for the install steps.
 ## Privacy
 
 - The AAS token and the account email are the only things uploaded.
+- Accounts are private to whoever added them and are only ever used to serve
+  that user's own linked gplaydl; they are never shared with anyone else.
 - The device secret and API key are stored in DataStore and excluded from
   cloud backup and device transfer (`res/xml/*_rules.xml`).
-- Users can flip an account back to private, or delete it from the dispenser,
-  from the accounts screen at any time. Revoking the app under Google account
-  settings invalidates the token outright.
+- Users can delete an account from the dispenser from the accounts screen at any
+  time. Revoking the app under Google account settings invalidates the token
+  outright.
 
 ## Attribution
 
