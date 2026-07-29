@@ -53,7 +53,8 @@ fun SettingsScreen(
     onOpenUrl: (String) -> Unit,
     onCopyApiKey: (String) -> Unit,
     onDisconnect: () -> Unit,
-    onBack: () -> Unit,
+    // Null when the screen lives in the tab bar and needs no way back.
+    onBack: (() -> Unit)?,
 ) {
     var url by remember(prefs.dispenserUrl) { mutableStateOf(prefs.dispenserUrl) }
     var showApiKey by remember { mutableStateOf(false) }
@@ -66,8 +67,10 @@ fun SettingsScreen(
             TopAppBar(
                 title = { Text("Settings") },
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    if (onBack != null) {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
                     }
                 },
             )

@@ -9,20 +9,28 @@ import android.os.PersistableBundle
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccountCircle
 import androidx.compose.material.icons.outlined.Cloud
+import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -44,8 +52,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.core.net.toUri
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.gplaydl.authenticator.auth.GoogleLoginActivity
 import com.gplaydl.authenticator.data.Visibility
@@ -127,14 +137,48 @@ fun AppRoot(viewModel: AppViewModel = viewModel(factory = AppViewModel.Factory))
 
     val start = if (state.prefs.isEnrolled) Routes.ACCOUNTS else Routes.CONSENT
 
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
+    // The tab bar is the app's whole navigation, but only once there is an
+    // identity to navigate around. The consent flow stays a single track.
+    val showTabs = state.prefs.isEnrolled && currentRoute != Routes.CONSENT
+
+    fun switchTab(route: String) {
+        if (currentRoute == route) return
+        navController.navigate(route) {
+            popUpTo(Routes.ACCOUNTS) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
     Scaffold(
         snackbarHost = { SnackbarHost(snackbar) },
+        bottomBar = {
+            if (showTabs) {
+                NavigationBar {
+                    Tab(currentRoute, Routes.ACCOUNTS, "Accounts", Icons.Outlined.AccountCircle, ::switchTab)
+                    Tab(currentRoute, Routes.PAIR, "Link gplaydl", Icons.Outlined.Link, ::switchTab)
+                    Tab(currentRoute, Routes.SETTINGS, "Settings", Icons.Outlined.Settings, ::switchTab)
+                }
+            }
+        },
         contentWindowInsets = WindowInsets(0),
     ) { padding ->
         NavHost(
             navController = navController,
             startDestination = start,
-            modifier = Modifier.padding(padding),
+            modifier = Modifier
+                .padding(padding)
+                .then(
+                    // The tab bar already sits on the system inset, so the
+                    // screens inside must not pad for it a second time.
+                    if (showTabs) {
+                        Modifier.consumeWindowInsets(WindowInsets.navigationBars)
+                    } else {
+                        Modifier
+                    },
+                ),
         ) {
             composable(Routes.CONSENT) {
                 var enrolling by remember { mutableStateOf(false) }
@@ -166,8 +210,6 @@ fun AppRoot(viewModel: AppViewModel = viewModel(factory = AppViewModel.Factory))
                     },
                     onRemove = viewModel::removeAccount,
                     onRefresh = viewModel::refresh,
-                    onOpenPairing = { navController.navigate(Routes.PAIR) },
-                    onOpenSettings = { navController.navigate(Routes.SETTINGS) },
                 )
             }
 
@@ -185,7 +227,6 @@ fun AppRoot(viewModel: AppViewModel = viewModel(factory = AppViewModel.Factory))
                         scope.launch { snackbar.showSnackbar("Pairing code copied.") }
                     },
                     onOpenUrl = ::openUrl,
-                    onBack = { navController.popBackStack() },
                 )
             }
 
@@ -215,7 +256,9 @@ fun AppRoot(viewModel: AppViewModel = viewModel(factory = AppViewModel.Factory))
                             }
                         }
                     },
-                    onBack = { navController.popBackStack() },
+                    // A tab needs no back arrow; the pre-enrolment visit from
+                    // the consent screen still gets one.
+                    onBack = if (showTabs) null else ({ navController.popBackStack() }),
                 )
             }
         }
@@ -234,6 +277,22 @@ fun AppRoot(viewModel: AppViewModel = viewModel(factory = AppViewModel.Factory))
     if (state.signIn is SignInProgress.Syncing) {
         FinishingDialog()
     }
+}
+
+@Composable
+private fun RowScope.Tab(
+    currentRoute: String?,
+    route: String,
+    label: String,
+    icon: ImageVector,
+    onSwitch: (String) -> Unit,
+) {
+    NavigationBarItem(
+        selected = currentRoute == route,
+        onClick = { onSwitch(route) },
+        icon = { Icon(icon, contentDescription = null) },
+        label = { Text(label) },
+    )
 }
 
 private fun sensitiveClip(label: String, text: String): ClipData =

@@ -21,8 +21,6 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Settings
-import androidx.compose.material.icons.outlined.Web
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -62,8 +60,6 @@ fun AccountsScreen(
     onReauthenticate: (SharedAccount) -> Unit,
     onRemove: (SharedAccount) -> Unit,
     onRefresh: () -> Unit,
-    onOpenPairing: () -> Unit,
-    onOpenSettings: () -> Unit,
 ) {
     var pendingRemoval by remember { mutableStateOf<SharedAccount?>(null) }
     var pendingPublic by remember { mutableStateOf<SharedAccount?>(null) }
@@ -79,12 +75,6 @@ fun AccountsScreen(
                         } else {
                             Icon(Icons.Outlined.Refresh, contentDescription = "Refresh accounts")
                         }
-                    }
-                    IconButton(onClick = onOpenPairing) {
-                        Icon(Icons.Outlined.Web, contentDescription = "Link gplaydl")
-                    }
-                    IconButton(onClick = onOpenSettings) {
-                        Icon(Icons.Outlined.Settings, contentDescription = "Settings")
                     }
                 },
             )
