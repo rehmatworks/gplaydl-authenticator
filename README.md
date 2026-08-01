@@ -2,12 +2,17 @@
 
 Android app that signs into a Google account, mints a long-lived AAS token, and
 syncs it to a [gplaydl dispenser](https://dispenser.gplaydl.com) so your own
-[gplaydl](https://github.com/rehmatworks/gplaydl) can download from Google Play.
+[gplaydl](https://github.com/rehmatworks/gplaydl) or
+[gplaydl web](https://gplaydl.com) can download from Google Play.
 
 Accounts you add are private to you: the dispenser only ever uses them to serve
 your own linked gplaydl. It replaces the copy-the-token-by-hand workflow, the
 app enrols itself with the dispenser on first launch, so there is no signup, no
 password and no manual paste step.
+
+> **Important:** This project uses unofficial Google Play access. Google may
+> flag, lock, or restrict accounts used with it. Please use a separate account
+> and continue at your own risk.
 
 ## How it works
 
@@ -43,7 +48,7 @@ consent  ->  enrol device  ->  Google sign-in  ->  mint AAS token  ->  sync
 
 ## Building
 
-Requires the Android SDK with platform 36 and **JDK 21** — AGP does not support
+Requires the Android SDK with platform 36 and **JDK 21**. AGP does not support
 JDK 25. If `java` on your machine is newer, point Gradle at a JDK 21 in
 `~/.gradle/gradle.properties` rather than in this repo, which has to stay
 portable for CI:
@@ -133,6 +138,12 @@ release. See the header of that script for the install steps.
 - Users can delete an account from the dispenser from the accounts screen at any
   time. Revoking the app under Google account settings invalidates the token
   outright.
+
+## Related projects
+
+- [gplaydl web](https://gplaydl.com) ([source](https://github.com/rehmatworks/gplaydl-web)) downloads APKs in a browser.
+- [gplaydl](https://github.com/rehmatworks/gplaydl) downloads APKs from the command line.
+- [gplaydl dispenser](https://dispenser.gplaydl.com) ([source](https://github.com/rehmatworks/gplaydl-dispenser)) stores accounts and serves private Play sessions.
 
 ## Attribution
 

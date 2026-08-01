@@ -66,7 +66,8 @@ fun ConsentScreen(
             icon = Icons.Outlined.ErrorOutline,
             title = "Use a spare account",
             body = "Prefer a throwaway over your primary, work, or payment-linked account. " +
-                "Google may revoke unofficial client access.",
+                "Google may flag, lock, or restrict accounts used with unofficial clients. " +
+                "Please continue at your own risk.",
         )
         ConsentPoint(
             icon = Icons.Outlined.Lock,

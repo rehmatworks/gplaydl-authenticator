@@ -109,7 +109,8 @@ fun SettingsScreen(
             Section("Privacy and terms")
             Text(
                 text = "Review what the dispenser stores, how your account tokens are used, and " +
-                    "the risks of unofficial Google Play access.",
+                    "the risks of unofficial Google Play access. Google may flag or restrict " +
+                    "accounts, so please use a separate account and continue at your own risk.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
