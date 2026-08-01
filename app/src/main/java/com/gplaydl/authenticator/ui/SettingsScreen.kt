@@ -108,18 +108,17 @@ fun SettingsScreen(
             Spacer(Modifier.height(28.dp))
             Section("Privacy and terms")
             Text(
-                text = "Review what the dispenser stores, how your account tokens are used, and " +
-                    "the risks of unofficial Google Play access. Google may flag or restrict " +
-                    "accounts, so please use a separate account and continue at your own risk.",
+                text = "Review how the dispenser handles your data and the conditions for using " +
+                    "unofficial Google Play access.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            TextButton(onClick = { onOpenUrl("${prefs.dispenserUrl}/#privacy") }) {
-                Text("Privacy notice")
+            TextButton(onClick = { onOpenUrl("${prefs.dispenserUrl.trimEnd('/')}/privacy") }) {
+                Text("Privacy policy")
                 Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null)
             }
-            TextButton(onClick = { onOpenUrl("${prefs.dispenserUrl}/#terms") }) {
-                Text("Terms")
+            TextButton(onClick = { onOpenUrl("${prefs.dispenserUrl.trimEnd('/')}/terms") }) {
+                Text("Terms of use")
                 Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null)
             }
 
