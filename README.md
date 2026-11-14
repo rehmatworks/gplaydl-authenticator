@@ -144,6 +144,7 @@ release. See the header of that script for the install steps.
 - [gplaydl web](https://gplaydl.com) ([source](https://github.com/rehmatworks/gplaydl-web)) downloads APKs in a browser.
 - [gplaydl](https://github.com/rehmatworks/gplaydl) downloads APKs from the command line.
 - [gplaydl dispenser](https://dispenser.gplaydl.com) ([source](https://github.com/rehmatworks/gplaydl-dispenser)) stores accounts and serves private Play sessions.
+- [AndroidPot](https://androidpot.net) downloads APKs without any Google account, in a browser with its [APK downloader](https://androidpot.net/apk-downloader) or on Android with the [AndroidPot app](https://androidpot.net/apps/androidpot-apk).
 
 ## Attribution
 

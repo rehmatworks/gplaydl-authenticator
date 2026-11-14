@@ -123,6 +123,23 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(20.dp))
+            Section("Without a Google account")
+            Text(
+                text = "AndroidPot downloads APKs from Google Play without any Google account, " +
+                    "in your browser or with its Android app.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = { onOpenUrl("https://androidpot.net/apk-downloader") }) {
+                Text("AndroidPot APK downloader")
+                Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null)
+            }
+            TextButton(onClick = { onOpenUrl("https://androidpot.net/apps/androidpot-apk") }) {
+                Text("Get the AndroidPot app")
+                Icon(Icons.AutoMirrored.Outlined.OpenInNew, contentDescription = null)
+            }
+
+            Spacer(Modifier.height(20.dp))
             HorizontalDivider()
             Spacer(Modifier.height(12.dp))
             TextButton(onClick = { showAdvanced = !showAdvanced }) {
